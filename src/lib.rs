@@ -92,14 +92,12 @@ pub fn generate_proxies(res: Vec<serde_json::Value>) -> (String, Vec<String>) {
 }
 
 pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> String {
-    let mut groups: Groups = toml::from_str(
-        &std::fs::read_to_string(path).expect("read groups.toml error."),
-    )
-    .expect("parse groups.toml error.");
+    let mut groups: Groups =
+        toml::from_str(&std::fs::read_to_string(path).expect("read groups.toml error."))
+            .expect("parse groups.toml error.");
 
     let mut groups_str = String::from("proxy-groups:\n");
     for g in groups.proxy_groups.iter_mut() {
-
         // proxies
         let mut empty = false;
         let mut proxie_str = String::new();
@@ -121,11 +119,13 @@ pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> String {
             }
         }
 
-        if empty { continue }
+        if empty {
+            continue;
+        }
 
         // name
         groups_str.push_str(&format!("  - name: {}\n", g.name));
-        
+
         // type
         groups_str.push_str(&format!("    type: {}\n", g.group_type));
 
@@ -146,10 +146,9 @@ pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> String {
 }
 
 pub fn generate_rules(path: &str) -> String {
-    let rulesets: Rulesets = toml::from_str(
-        &std::fs::read_to_string(path).expect("read rulesets.toml error."),
-    )
-    .expect("parse rulesets.toml error.");
+    let rulesets: Rulesets =
+        toml::from_str(&std::fs::read_to_string(path).expect("read rulesets.toml error."))
+            .expect("parse rulesets.toml error.");
 
     let mut clash_rules: Vec<String> = Vec::new();
     for rule_set in rulesets.rulesets.iter() {
@@ -157,11 +156,13 @@ pub fn generate_rules(path: &str) -> String {
         if ruleset == "MATCH" {
             clash_rules.push(format!("{},{}", ruleset, rule_set.group))
         } else {
-            let ruleset_content = std::fs::read_to_string(&ruleset).expect(&format!("read {ruleset} error."));
-            let rules: Vec<String> = ruleset_content.lines()
+            let ruleset_content = std::fs::read_to_string(&format!("clash/{}", ruleset))
+                .expect(&format!("read {ruleset} error."));
+            let rules: Vec<String> = ruleset_content
+                .lines()
                 .filter(|line| !line.starts_with("#"))
-                .map(|line| format!("{},{}", line, rule_set.group)
-            ).collect();
+                .map(|line| format!("{},{}", line, rule_set.group))
+                .collect();
             clash_rules.extend(rules);
         }
     }
@@ -182,3 +183,4 @@ pub fn generate_rules(path: &str) -> String {
 
     clash_rules_string
 }
+

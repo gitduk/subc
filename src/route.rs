@@ -8,7 +8,7 @@ pub async fn _env() -> serde_json::Value {
 pub async fn sub() -> String {
     // generate clash basic config
     let config: Config = toml::from_str(
-        &std::fs::read_to_string("clash/config.toml").expect("read config.toml error."),
+        &std::fs::read_to_string("clash/conf/config.toml").expect("read config.toml error."),
     )
     .expect("parse config.toml error.");
     let config = serde_yaml::to_string(&config).unwrap();
@@ -21,10 +21,10 @@ pub async fn sub() -> String {
     let (proxyes, nodes) = generate_proxies(res);
 
     // generate proxy-groups
-    let proxy_groups = generate_proxy_groups("clash/groups.toml", nodes);
+    let proxy_groups = generate_proxy_groups("clash/conf/groups.toml", nodes);
 
     // generate rules
-    let rules = generate_rules("clash/rulesets.toml");
+    let rules = generate_rules("clash/conf/rulesets.toml");
 
     config + "\n" + &proxyes + "\n" + &proxy_groups + "\n" + &rules
 }

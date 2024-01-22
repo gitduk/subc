@@ -37,14 +37,14 @@ type = "select"
 proxies = [".*?"]
 
 [[proxy-groups]]
-name = "🐼 全球直连"
-type = "select"
-proxies = ["[]DIRECT", "[]🌻 节点选择"]
-
-[[proxy-groups]]
 name = "🐻 Chat"
 type = "select"
 proxies = ["[]🇮🇳 印度", "[]🇹🇷 土耳其", "[]🇰🇷 韩国", "[]🇺🇲 美国", "[]🐏 手动切换"]
+
+[[proxy-groups]]
+name = "🐼 全球直连"
+type = "select"
+proxies = ["[]DIRECT", "[]🌻 节点选择"]
 
 [[proxy-groups]]
 name = "🦍 广告拦截"
