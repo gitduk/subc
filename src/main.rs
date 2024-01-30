@@ -1,9 +1,18 @@
-use axum::routing::{get, Router};
+use axum::{
+    extract::{MatchedPath, Request},
+    http::StatusCode,
+    middleware,
+    response::IntoResponse,
+    routing::{get, Router},
+};
 use dotenvy;
-use std::fs;
 use std::path::Path;
+use std::time::Duration;
+use tokio::signal;
+use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod handler;
+mod request_middleware;
 mod route;
 
 #[tokio::main]
@@ -12,46 +21,75 @@ async fn main() {
     let dotfile = Path::new("clash/.env");
 
     if !dotfile.exists() {
-        let _ = copy_directory(Path::new("default"), Path::new("clash"));
+        let _ = subc::copy_directory(Path::new("default"), Path::new("clash"));
     }
 
     // load dotfile
     dotenvy::from_path(Path::new("clash/.env")).expect(".env file not found");
 
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+    // Enable tracing.
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "subc=debug,tower_http=debug,axum=trace".into()),
+        )
+        .with(tracing_subscriber::fmt::layer().without_time())
         .init();
 
     let app = Router::new()
         .route("/", get(|| async { "ok" }))
-        .route("/sub", get(route::sub));
+        .route("/sub", get(route::sub))
+        .layer((
+            TraceLayer::new_for_http()
+                .make_span_with(|req: &Request| {
+                    let method = req.method();
+                    let uri = req.uri();
 
-    let app = app.fallback(handler::handler_404);
+                    // axum automatically adds this extension.
+                    let path = req
+                        .extensions()
+                        .get::<MatchedPath>()
+                        .map(|matched_path| matched_path.as_str());
 
+                    tracing::debug_span!("request", %method, %uri, path)
+                })
+                .on_failure(()),
+            middleware::from_fn(request_middleware::print_request_body),
+            TimeoutLayer::new(Duration::from_secs(10)),
+        ));
+
+    let app = app.fallback(handler_404);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    tracing::debug!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
 }
 
-fn copy_directory<S: AsRef<Path>, D: AsRef<Path>>(
-    source: S,
-    destination: D,
-) -> std::io::Result<()> {
-    // 创建目标目录
-    fs::create_dir_all(&destination)?;
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
 
-    for entry in fs::read_dir(source)? {
-        let entry = entry?;
-        let path = entry.path();
-        let dest_path = destination.as_ref().join(entry.file_name());
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
 
-        if path.is_dir() {
-            // 如果是目录，递归复制
-            copy_directory(path, dest_path)?;
-        } else {
-            // 如果是文件，直接复制
-            fs::copy(path, dest_path)?;
-        }
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
+}
 
-    Ok(())
+pub async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "nothing to see here")
 }

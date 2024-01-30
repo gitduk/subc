@@ -1,3 +1,7 @@
+use regex::Regex;
+use std::fs;
+use std::path::Path;
+
 pub mod decode;
 pub mod structs;
 
@@ -56,11 +60,11 @@ pub async fn get_nodes(url: String) -> Vec<serde_json::Value> {
 pub fn filter_node(pattern: &str, nodes: Vec<String>) -> Vec<String> {
     let mut filtered_node = vec![];
     for node_name in nodes {
-        let re = match regex::Regex::new(pattern) {
+        let re = match Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
                 println!("your pattern `{pattern}` is invalied. {e}");
-                regex::Regex::new("").unwrap()
+                Regex::new("").unwrap()
             }
         };
 
@@ -170,7 +174,7 @@ pub fn generate_rules(path: &str) -> String {
     let mut clash_rules_string = String::new();
     clash_rules_string.push_str("rules:\n");
     for rule in clash_rules.iter_mut() {
-        let re = regex::Regex::new("no-resolve").unwrap();
+        let re = Regex::new("no-resolve").unwrap();
 
         if re.is_match(&rule) {
             let mut parts: Vec<&str> = rule.split(',').collect();
@@ -184,3 +188,26 @@ pub fn generate_rules(path: &str) -> String {
     clash_rules_string
 }
 
+pub fn copy_directory<S: AsRef<Path>, D: AsRef<Path>>(
+    source: S,
+    destination: D,
+) -> std::io::Result<()> {
+    // 创建目标目录
+    fs::create_dir_all(&destination)?;
+
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest_path = destination.as_ref().join(entry.file_name());
+
+        if path.is_dir() {
+            // 如果是目录，递归复制
+            copy_directory(path, dest_path)?;
+        } else {
+            // 如果是文件，直接复制
+            fs::copy(path, dest_path)?;
+        }
+    }
+
+    Ok(())
+}
