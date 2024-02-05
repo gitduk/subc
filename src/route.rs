@@ -1,4 +1,4 @@
-use subc::{generate_proxies, generate_proxy_groups, generate_rules, get_nodes, structs::*};
+use subc::{generate_proxies, generate_proxy_groups, generate_rules, get_nodes};
 
 pub async fn _env() -> serde_json::Value {
     let env_vars = std::env::vars().collect::<std::collections::HashMap<String, String>>();
@@ -6,12 +6,8 @@ pub async fn _env() -> serde_json::Value {
 }
 
 pub async fn sub() -> String {
-    // generate clash basic config
-    let config: Config = toml::from_str(
-        &std::fs::read_to_string("clash/conf/config.toml").expect("read config.toml error."),
-    )
-    .expect("parse config.toml error.");
-    let config = serde_yaml::to_string(&config).unwrap();
+    // read clash basic config
+    let config: String = std::fs::read_to_string("clash/conf/config.yaml").expect("read config.toml error.");
 
     // generate proxies
     let res = match std::env::var("URL") {
@@ -26,5 +22,5 @@ pub async fn sub() -> String {
     // generate rules
     let rules = generate_rules("clash/conf/rulesets.toml");
 
-    config + "\n" + &proxyes + "\n" + &proxy_groups + "\n" + &rules
+    config.trim().to_string() + "\n\n" + &proxyes + "\n" + &proxy_groups + "\n" + &rules
 }

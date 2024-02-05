@@ -12,7 +12,7 @@ use tokio::signal;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod request_middleware;
+mod middlewares;
 mod route;
 
 #[tokio::main]
@@ -54,7 +54,7 @@ async fn main() {
                     tracing::debug_span!("request", %method, %uri, path)
                 })
                 .on_failure(()),
-            middleware::from_fn(request_middleware::print_request_body),
+            middleware::from_fn(middlewares::print_request_body),
             TimeoutLayer::new(Duration::from_secs(10)),
         ));
 
