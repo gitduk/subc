@@ -12,7 +12,6 @@ WORKDIR /app
 RUN chown appuser:appgroup /app
 
 USER appuser
-COPY default default
 COPY --from=builder /usr/src/app/target/release/subc .
 
 EXPOSE 3000

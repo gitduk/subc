@@ -15,15 +15,14 @@ pub async fn env() -> serde_json::Value {
     serde_json::json!(env_vars)
 }
 
-pub async fn get_nodes(url: String) -> Vec<serde_json::Value> {
+pub async fn get_nodes(url: String) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
     let res = reqwest::Client::new()
         .get(url)
         .header("User-Agent", UA)
         .header("Accept", AC)
         .send()
-        .await
-        .unwrap();
-    let encoded = res.text().await.unwrap();
+        .await?;
+    let encoded = res.text().await?;
     let node_str = decode::base64_decode(encoded);
 
     let mut nodes = vec![];
@@ -54,7 +53,7 @@ pub async fn get_nodes(url: String) -> Vec<serde_json::Value> {
             }));
         }
     }
-    nodes
+    Ok(nodes)
 }
 
 pub fn filter_node(pattern: &str, nodes: Vec<String>) -> Vec<String> {
@@ -95,10 +94,24 @@ pub fn generate_proxies(res: Vec<serde_json::Value>) -> (String, Vec<String>) {
     (nodes_string, nodes)
 }
 
-pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> String {
-    let mut groups: Groups =
-        toml::from_str(&std::fs::read_to_string(path).expect("read groups.toml error."))
-            .expect("parse groups.toml error.");
+pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> Result<String, Box<dyn std::error::Error>> {
+    let group_string = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            let error = match e.kind() {
+                std::io::ErrorKind::NotFound => format!("{} is not found.", path),
+                _ => format!("read file failed: {e}"),
+            };
+            return Err(error.into());
+        }
+    };
+
+    let mut groups: Groups = match toml::from_str(&group_string) {
+        Ok(g) => g,
+        Err(e) => {
+            return Err(e.into());
+        }
+    };
 
     let mut groups_str = String::from("proxy-groups:\n");
     for g in groups.proxy_groups.iter_mut() {
@@ -146,13 +159,28 @@ pub fn generate_proxy_groups(path: &str, nodes: Vec<String>) -> String {
         groups_str.push_str(&proxie_str);
     }
 
-    groups_str
+    Ok(groups_str)
+
 }
 
-pub fn generate_rules(path: &str) -> String {
-    let rulesets: Rulesets =
-        toml::from_str(&std::fs::read_to_string(path).expect("read rulesets.toml error."))
-            .expect("parse rulesets.toml error.");
+pub fn generate_rules(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let rulesets_string = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) => {
+            let error = match e.kind() {
+                std::io::ErrorKind::NotFound => format!("{} is not found.", path),
+                _ => format!("read file failed: {e}"),
+            };
+            return Err(error.into());
+        }
+    };
+
+    let rulesets: Rulesets = match toml::from_str(&rulesets_string) {
+        Ok(r) => r,
+        Err(e) => {
+            return Err(e.into());
+        }
+    };
 
     let mut clash_rules: Vec<String> = Vec::new();
     for rule_set in rulesets.rulesets.iter() {
@@ -160,8 +188,17 @@ pub fn generate_rules(path: &str) -> String {
         if ruleset == "MATCH" {
             clash_rules.push(format!("{},{}", ruleset, rule_set.group))
         } else {
-            let ruleset_content = std::fs::read_to_string(&format!("clash/{}", ruleset))
-                .expect(&format!("read {ruleset} error."));
+            let ruleset_content = match std::fs::read_to_string(&format!("clash/{}", ruleset)) {
+                Ok(s) => s,
+                Err(e) => {
+                    let error = match e.kind() {
+                        std::io::ErrorKind::NotFound => format!("{ruleset} is not found."),
+                        _ => format!("read {ruleset} failed: {e}"),
+                    };
+                    return Err(error.into());
+                }
+            };
+
             let rules: Vec<String> = ruleset_content
                 .lines()
                 .filter(|line| !line.starts_with("#"))
@@ -185,7 +222,8 @@ pub fn generate_rules(path: &str) -> String {
         clash_rules_string.push_str(&format!("  - {}\n", rule));
     }
 
-    clash_rules_string
+    Ok(clash_rules_string)
+
 }
 
 pub fn copy_directory<S: AsRef<Path>, D: AsRef<Path>>(

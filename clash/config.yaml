@@ -1,73 +1,60 @@
-# port: 7890 # HTTP(S) 代理服务器端口
-# socks-port: 7891 # SOCKS5 代理端口
-mixed-port: 7890 # HTTP(S) 和 SOCKS 代理混合端口
-# redir-port: 7892 # 透明代理端口，用于 Linux 和 MacOS
+# HTTP(S) 和 SOCKS 代理混合端口
+mixed-port: 7890
+
+# HTTP(S) 代理服务器端口
+# port: 7890
+
+# SOCKS5 代理端口
+# socks-port: 7891
+
+# 透明代理端口，用于 Linux 和 MacOS
+# redir-port: 7892
 
 # Transparent proxy server port for Linux (TProxy TCP and TProxy UDP)
 # tproxy-port: 7893
 
-allow-lan: true # 允许局域网连接
-bind-address: "*" # 绑定 IP 地址，仅作用于 allow-lan 为 true，'*'表示所有地址
+# 允许局域网连接
+allow-lan: true
 
-# authentication: # http,socks入口的验证用户名，密码
-#   - "username:password"
+# 开启 IPv6 总开关，关闭阻断所有 IPv6 链接和屏蔽 DNS 请求 AAAA 记录
+ipv6: true
 
-skip-auth-prefixes: # 设置跳过验证的IP段
-  - 127.0.0.1/8
-  - ::1/128
+# 绑定 IP 地址，仅作用于 allow-lan 为 true，'*'表示所有地址
+bind-address: "*"
 
-lan-allowed-ips: # 允许连接的 IP 地址段，仅作用于 allow-lan 为 true, 默认值为0.0.0.0/0和::/0
-  - 0.0.0.0/0
-  - ::/0
-
-lan-disallowed-ips: # 禁止连接的 IP 地址段, 黑名单优先级高于白名单, 默认值为空
-  - 192.168.0.3/32
-
-#  find-process-mode has 3 values:always, strict, off
-#  - always, 开启，强制匹配所有进程
-#  - strict, 默认，由 mihomo 判断是否开启
-#  - off, 不匹配进程，推荐在路由器上使用此模式
-find-process-mode: strict
-
+# 规则引擎
 mode: rule
 
-#自定义 geodata url
-geox-url:
-  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
-  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
-  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.metadb"
+# http,socks入口的验证用户名，密码
+# authentication:
+#   - "clash:changeme"
 
-geo-auto-update: false # 是否自动更新 geodata
-geo-update-interval: 24 # 更新间隔，单位：小时
+# 设置跳过验证的IP段
+# skip-auth-prefixes:
+#   - 127.0.0.1/8
+#   - ::1/128
 
-# Matcher implementation used by GeoSite, available implementations:
-# - succinct (default, same as rule-set)
-# - mph (from V2Ray, also `hybrid` in Xray)
-# geosite-matcher: succinct
+# 允许连接的 IP 地址段，仅作用于 allow-lan 为 true, 默认值为0.0.0.0/0和::/0
+# lan-allowed-ips:
+#   - 0.0.0.0/0
+#   - ::/0
 
-log-level: debug # 日志等级 silent/error/warning/info/debug
+# 禁止连接的 IP 地址段, 黑名单优先级高于白名单, 默认值为空
+# lan-disallowed-ips:
+#   - 192.168.0.3/32
 
-ipv6: true # 开启 IPv6 总开关，关闭阻断所有 IPv6 链接和屏蔽 DNS 请求 AAAA 记录
-
-tls:
-  certificate: string # 证书 PEM 格式，或者 证书的路径
-  private-key: string # 证书对应的私钥 PEM 格式，或者私钥路径
-  custom-certifactes:
-    - |
-      -----BEGIN CERTIFICATE-----
-      format/pem...
-      -----END CERTIFICATE-----
-
-external-controller: 0.0.0.0:9093 # RESTful API 监听地址
-external-controller-tls: 0.0.0.0:9443 # RESTful API HTTPS 监听地址，需要配置 tls 部分配置文件
-# secret: "123456" # `Authorization:Bearer ${secret}`
+# tls:
+#   # 证书 PEM 格式，或者 证书的路径
+#   certificate: string
+#   # 证书对应的私钥 PEM 格式，或者私钥路径
+#   private-key: string
+#   custom-certifactes:
+#     - |
+#       -----BEGIN CERTIFICATE-----
+#       format/pem...
+#       -----END CERTIFICATE-----
 
 # tcp-concurrent: true # TCP 并发连接所有 IP, 将使用最快握手的 TCP
-
-# 配置 WEB UI 目录，使用 http://{{external-controller}}/ui 访问
-external-ui: /path/to/ui/folder/
-external-ui-name: xd
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
 
 # interface-name: en0 # 设置出口网卡
 
@@ -79,15 +66,41 @@ global-client-fingerprint: chrome
 #  TCP keep alive interval
 keep-alive-interval: 15
 
+# find-process-mode has 3 values:always, strict, off
+# always: 开启，强制匹配所有进程
+# strict: 默认，由 mihomo 判断是否开启
+# off: 不匹配进程，推荐在路由器上使用此模式
+find-process-mode: strict
+
+# 自定义 geodata url
+geox-url:
+  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
+  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.metadb"
+
+# 是否自动更新 geodata
+geo-auto-update: false
+
+# 更新间隔，单位：小时
+geo-update-interval: 24
+
+# Matcher implementation used by GeoSite, available implementations:
+# - succinct (default, same as rule-set)
+# - mph (from V2Ray, also `hybrid` in Xray)
+# geosite-matcher: succinct
+
+# 日志等级 silent/error/warning/info/debug
+log-level: info
+
 # routing-mark:6666 # 配置 fwmark 仅用于 Linux
-experimental:
-  # Disable quic-go GSO support. This may result in reduced performance on Linux.
-  # This is not recommended for most users.
-  # Only users encountering issues with quic-go's internal implementation should enable this,
-  # and they should disable it as soon as the issue is resolved.
-  # This field will be removed when quic-go fixes all their issues in GSO.
-  # This equivalent to the environment variable QUIC_GO_DISABLE_GSO=1.
-  #quic-go-disable-gso: true
+# experimental:
+#   # Disable quic-go GSO support. This may result in reduced performance on Linux.
+#   # This is not recommended for most users.
+#   # Only users encountering issues with quic-go's internal implementation should enable this,
+#   # and they should disable it as soon as the issue is resolved.
+#   # This field will be removed when quic-go fixes all their issues in GSO.
+#   # This equivalent to the environment variable QUIC_GO_DISABLE_GSO=1.
+#   #quic-go-disable-gso: true
 
 # 类似于 /etc/hosts, 仅支持配置单个 IP
 hosts:
@@ -98,7 +111,8 @@ hosts:
 # home.lan: lan # lan 为特别字段，将加入本地所有网卡的地址
 # baidu.com: google.com # 只允许配置一个别名
 
-profile: # 存储 select 选择记录
+# 存储 select 选择记录
+profile:
   store-selected: false
 
   # 持久化 fake-ip
@@ -147,12 +161,12 @@ tun:
   # exclude-package: # 排除被路由的 Android 应用包名
   # - com.android.captiveportallogin
 
-#ebpf配置
-ebpf:
-  auto-redir: # redirect 模式，仅支持 TCP
-    - eth0
-  redirect-to-tun: # UDP+TCP 使用该功能请勿启用 auto-route
-    - eth0
+# ebpf配置
+# ebpf:
+#   auto-redir: # redirect 模式，仅支持 TCP
+#     - eth0
+#   redirect-to-tun: # UDP+TCP 使用该功能请勿启用 auto-route
+#     - eth0
 
 # 嗅探域名 可选配置
 sniffer:
@@ -167,9 +181,9 @@ sniffer:
   override-destination: false
   sniff: # TLS 和 QUIC 默认如果不配置 ports 默认嗅探 443
     QUIC:
-    #  ports: [ 443 ]
+      ports: [443]
     TLS:
-    #  ports: [443, 8443]
+      ports: [443, 8443]
 
     # 默认嗅探 80
     HTTP: # 需要嗅探的端口
@@ -181,28 +195,16 @@ sniffer:
   ## 对嗅探结果进行跳过
   # skip-domain:
   #   - Mijia Cloud
-  # 需要嗅探协议
-  # 已废弃，若 sniffer.sniff 配置则此项无效
-  sniffing:
-    - tls
-    - http
-  # 强制对此域名进行嗅探
 
-  # 仅对白名单中的端口进行嗅探，默认为 443，80
-  # 已废弃，若 sniffer.sniff 配置则此项无效
-  port-whitelist:
-    - "80"
-    - "443"
-    # - 8000-9999
-
-tunnels: # one line config
-  - tcp/udp,127.0.0.1:6553,114.114.114.114:53,proxy
-  - tcp,127.0.0.1:6666,rds.mysql.com:3306,vpn
-  # full yaml config
-  - network: [tcp, udp]
-    address: 127.0.0.1:7777
-    target: target.com
-    proxy: proxy
+# tunnels:
+#   # one line config
+#   - tcp/udp,127.0.0.1:6553,114.114.114.114:53,proxy
+#   - tcp,127.0.0.1:6666,rds.mysql.com:3306,vpn
+#   # full yaml config
+#   - network: [tcp, udp]
+#     address: 127.0.0.1:7777
+#     target: target.com
+#     proxy: proxy
 
 # DNS配置
 dns:
@@ -286,3 +288,16 @@ dns:
     ## 且 behavior 必须为 domain/classical，当为 classical 时仅会生效域名类规则
     # "rule-set:global,dns": 8.8.8.8
 
+# RESTful API 监听地址
+external-controller: 0.0.0.0:9090
+
+# RESTful API HTTPS 监听地址，需要配置 tls 部分配置文件
+external-controller-tls: 0.0.0.0:9443
+
+# `Authorization:Bearer ${secret}`
+# secret: "123456"
+
+# 配置 WEB UI 目录，使用 http://{{external-controller}}/ui 访问
+# external-ui: /path/to/ui/folder/
+# external-ui-name: xd
+# external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"

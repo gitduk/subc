@@ -5,7 +5,6 @@ use axum::{
     response::IntoResponse,
     routing::{get, Router},
 };
-use dotenvy;
 use std::path::Path;
 use std::time::Duration;
 use tokio::signal;
@@ -17,16 +16,6 @@ mod route;
 
 #[tokio::main]
 async fn main() {
-    // init config
-    let dotfile = Path::new("clash/.env");
-
-    if !dotfile.exists() {
-        let _ = subc::copy_directory(Path::new("default"), Path::new("clash"));
-    }
-
-    // load dotfile
-    dotenvy::from_path(Path::new("clash/.env")).expect(".env file not found");
-
     // Enable tracing.
     tracing_subscriber::registry()
         .with(
@@ -35,6 +24,20 @@ async fn main() {
         )
         .with(tracing_subscriber::fmt::layer().without_time())
         .init();
+
+    // init dotfile
+    let dotfile = Path::new("clash/.env");
+
+    if !dotfile.exists() {
+        match std::fs::File::create(dotfile) {
+            Ok(_) => {
+                tracing::debug!("create .env");
+            },
+            Err(e) => {
+                eprint!("create .env failed: {e}");
+            }
+        }
+    }
 
     let app = Router::new()
         .route("/", get(|| async { "ok" }))
