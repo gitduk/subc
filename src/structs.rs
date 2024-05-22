@@ -1,92 +1,63 @@
-use std::vec;
-
 use serde::{Deserialize, Serialize};
 
-// basic config
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ProxyGroup {
+    Select {
+        name: String,
+        proxies: Vec<String>,
+    },
+    #[serde(rename = "load-balance")]
+    LoadBalance {
+        name: String,
+        strategy: String,
+        url: String,
+        interval: u64,
+        proxies: Vec<String>,
+    },
+    #[serde(rename = "url-test")]
+    UrlTest {
+        name: String,
+        url: String,
+        interval: u64,
+        tolerance: u64,
+        proxies: Vec<String>,
+    },
+    FallBack {
+        name: String,
+        url: String,
+        interval: u64,
+        tolerance: u64,
+        proxies: Vec<String>,
+    },
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
     #[serde(rename = "mixed-port")]
-    pub mixed_port: u32,
-    #[serde(rename = "redir-port")]
-    pub redir_port: u32,
-    #[serde(rename = "allow-lan", default)]
+    pub mixed_port: u64,
+    #[serde(rename = "allow-lan")]
     pub allow_lan: bool,
+    #[serde(rename = "bind-address")]
+    pub bind_address: String,
     pub mode: String,
-    #[serde(rename = "log-level", default)]
-    pub log_level: String,
-    pub secret: String,
-    #[serde(rename = "external-controller")]
-    pub external_controller: String,
+    #[serde(default)]
+    pub proxies: Vec<serde_json::Value>,
+    #[serde(rename = "proxy-groups")]
+    pub proxy_groups: Vec<ProxyGroup>,
+    pub rules: Vec<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Config {
+        Self {
             mixed_port: 7890,
-            redir_port: 7891,
             allow_lan: true,
-            mode: String::from("Rule"),
-            log_level: String::from("debug"),
-            secret: String::from("clash"),
-            external_controller: String::from(":9090"),
-        }
-    }
-}
-
-// proxy-groups
-#[derive(Debug, Deserialize)]
-pub struct Groups {
-    #[serde(rename = "proxy-groups")]
-    pub proxy_groups: Vec<Group>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Group {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub group_type: String,
-    #[serde(default)]
-    pub url: String,
-    #[serde(default)]
-    pub interval: u32,
-    #[serde(default)]
-    pub tolerance: u32,
-    #[serde(default)]
-    pub strategy: String,
-    pub proxies: Vec<String>,
-}
-
-impl Default for Group {
-    fn default() -> Self {
-        Group {
-            name: String::from(""),
-            group_type: String::from("select"),
-            url: String::from("http://www.gstatic.com/generate_204"),
-            interval: 180,
-            tolerance: 180,
-            strategy: String::from("round-robin"),
-            proxies: vec![],
-        }
-    }
-}
-
-// rules
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Rulesets {
-    pub rulesets: Vec<Ruleset>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Ruleset {
-    pub group: String,
-    pub ruleset: String,
-}
-
-impl Default for Ruleset {
-    fn default() -> Self {
-        Ruleset {
-            group: String::from(""),
-            ruleset: String::from(""),
+            bind_address: String::from("*"),
+            mode: String::from("rule"),
+            proxies: Vec::new(),
+            proxy_groups: Vec::new(),
+            rules: Vec::new(),
         }
     }
 }
