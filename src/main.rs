@@ -1,13 +1,11 @@
 mod handler;
-mod middleware;
 mod route;
 mod service;
 mod structs;
 mod utils;
 
 use handler::*;
-use std::time::Duration;
-use tracing_subscriber::{fmt, prelude::*, registry, EnvFilter};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +17,7 @@ async fn main() {
         .with(fmt::layer())
         .init();
 
-    let app = crate::route::init_app();
+    let app = crate::route::init_app().await;
     let app = app.fallback(handler_404);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3078").await.unwrap();
     tracing::debug!("listening on {}", listener.local_addr().unwrap());

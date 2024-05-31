@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone)]
+pub struct AppState {
+    pub nodes: Vec<serde_json::Value>,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ProxyGroup {
@@ -33,14 +38,12 @@ pub enum ProxyGroup {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct ProxyProvider {
+    pub proxies: Vec<serde_json::Value>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Config {
-    #[serde(rename = "mixed-port")]
-    pub mixed_port: u64,
-    #[serde(rename = "allow-lan")]
-    pub allow_lan: bool,
-    #[serde(rename = "bind-address")]
-    pub bind_address: String,
-    pub mode: String,
     #[serde(default)]
     pub proxies: Vec<serde_json::Value>,
     #[serde(rename = "proxy-groups")]
@@ -51,10 +54,6 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            mixed_port: 7890,
-            allow_lan: true,
-            bind_address: String::from("*"),
-            mode: String::from("rule"),
             proxies: Vec::new(),
             proxy_groups: Vec::new(),
             rules: Vec::new(),

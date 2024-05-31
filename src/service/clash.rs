@@ -1,69 +1,52 @@
-use anyhow::{Error, Result};
+use anyhow::Result;
 use axum::{
-    extract::Query,
-    response::{Html, IntoResponse},
+    extract::{Query, State},
+    response::IntoResponse,
 };
 use regex::Regex;
-use reqwest::Proxy;
-use std::{collections::HashMap, path::StripPrefixError};
-use tokio::io::AsyncBufReadExt;
+use std::collections::HashMap;
 
-use crate::structs::{Config, ProxyGroup};
+use crate::structs::{AppState, Config, ProxyGroup, ProxyProvider};
 use crate::utils::{base64_decode, base64_decode_no_pad};
 
 const UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const AC: &str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
 
-pub const DEFAULT_CONFIG: &str = r#"
-mixed-port: 7890
-allow-lan: true
-bind-address: "*"
-mode: rule
-
-proxy-groups:
-  - name: "🌻 节点选择"
-    type: "select"
-    proxies:
-      - "[]🌲 负载均衡-轮询"
-      - "[]🍁 负载均衡-散列"
-      - "[]🐏 手动切换"
-
-  - name: "🌲 负载均衡-轮询"
-    type: "load-balance"
-    strategy: "round-robin"
-    url: "http://www.gstatic.com/generate_204"
-    interval: 180
-    proxies:
-      - "香港[^-]|台湾|日本"
-
-  - name: "🍁 负载均衡-散列"
-    type: "load-balance"
-    strategy: "consistent-hashing"
-    url: "http://www.gstatic.com/generate_204"
-    interval: 180
-    proxies:
-      - "香港[^-]|台湾|日本"
-
-  - name: "🐏 手动切换"
-    type: "select"
-    proxies:
-      - ".*?"
-
-  - name: 🪁 Match
-    type: select
-    proxies:
-      - "[]🌻 节点选择"
-      - DIRECT
-
-rules:
-  - group: DIRECT
-    ruleset: lan_cidr.txt
-
-  - group: 🪁 Match
-    ruleset: MATCH
-"#;
+pub async fn build_provider(
+    State(state): State<AppState>,
+    Query(re): Query<HashMap<String, String>>,
+) -> impl IntoResponse {
+    let pattern = re.get("re").expect("re param missing");
+    let proxies = state
+        .nodes
+        .iter()
+        .filter(|node| {
+            if let Some(name) = node.get("name") {
+                let name = name.as_str().unwrap_or_default();
+                Regex::new(pattern)
+                    .expect("Inviled re pattern")
+                    .is_match(name)
+            } else {
+                false
+            }
+        })
+        .map(|n| n.to_owned())
+        .collect::<Vec<_>>();
+    let provider = ProxyProvider { proxies };
+    let provider = serde_yaml::to_value(provider).expect("Convert Provider Error");
+    serde_yaml::to_string(&provider).expect("Convert Provider Error")
+}
 
 pub async fn from_url(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
+    let template_path = xdg::BaseDirectories::with_prefix("clash")
+        .unwrap()
+        .place_config_file("template.yaml")
+        .unwrap();
+    if !template_path.exists() {
+        return format!("template.yaml not exists");
+    }
+    let template_string = std::fs::read_to_string(template_path).unwrap();
+
     let url = params.get("url").unwrap();
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return format!("Invalid url: {url}");
@@ -81,17 +64,6 @@ pub async fn from_url(Query(params): Query<HashMap<String, String>>) -> impl Int
 
     // get nodes
     let nodes = get_nodes_from(url).await.unwrap();
-    let nodes = nodes
-        .iter()
-        .filter(|node| {
-            if let serde_json::Value::Object(map) = node {
-                if map.is_empty() {
-                    return false;
-                }
-            }
-            true
-        })
-        .collect::<Vec<_>>();
 
     let proxy_name_vec: Vec<_> = nodes
         .iter()
@@ -104,30 +76,44 @@ pub async fn from_url(Query(params): Query<HashMap<String, String>>) -> impl Int
         .collect::<Vec<_>>();
 
     // process proxy-groups
-    config
-        .proxy_groups
-        .iter_mut()
-        .for_each(|group| match group {
-            ProxyGroup::Select { proxies, .. }
-            | ProxyGroup::LoadBalance { proxies, .. }
-            | ProxyGroup::UrlTest { proxies, .. }
-            | ProxyGroup::FallBack { proxies, .. } => {
-                let mut filtered_proxies: Vec<String> = vec![];
-                for p in proxies.clone() {
-                    if p.starts_with("[]") {
-                        filtered_proxies.push(p.clone().replace("[]", ""));
-                        continue;
-                    }
-                    proxy_name_vec.iter().for_each(|n| {
-                        if regex::Regex::new(&p).unwrap().is_match(n) {
-                            filtered_proxies.push(n.replace('"', ""));
-                        }
-                    });
+    let mut proxy_dict = HashMap::new();
+    config.proxy_groups.iter().for_each(|group| match group {
+        ProxyGroup::Select { name, proxies, .. }
+        | ProxyGroup::LoadBalance { name, proxies, .. }
+        | ProxyGroup::UrlTest { name, proxies, .. }
+        | ProxyGroup::FallBack { name, proxies, .. } => {
+            let mut filtered_proxies: Vec<String> = vec![];
+            for p in proxies.clone() {
+                if p.starts_with("[]") {
+                    filtered_proxies.push(p);
+                    continue;
                 }
-                *proxies = filtered_proxies;
+                proxy_name_vec.iter().for_each(|n| {
+                    if regex::Regex::new(&p).unwrap().is_match(n) {
+                        filtered_proxies.push(n.replace('"', ""));
+                    }
+                });
             }
-        });
+            if !filtered_proxies.is_empty() {
+                proxy_dict.insert(name.to_owned(), filtered_proxies);
+            }
+        }
+    });
 
+    // remove empty group
+    let keys: Vec<String> = proxy_dict.keys().cloned().collect();
+    for (_, value) in proxy_dict.iter_mut() {
+        *value = value
+            .iter()
+            .filter(|v| {
+                if v.starts_with("[]") && !["[]DIRECT", "[]REJECT"].contains(&v.as_str()) {
+                    return keys.contains(&v.replace("[]", ""));
+                }
+                return true;
+            })
+            .map(|v| v.to_owned())
+            .collect::<Vec<String>>();
+    }
     config.proxy_groups.retain(|group| match group {
         ProxyGroup::Select { proxies, .. }
         | ProxyGroup::LoadBalance { proxies, .. }
@@ -162,10 +148,10 @@ pub async fn from_url(Query(params): Query<HashMap<String, String>>) -> impl Int
     let config_value = serde_yaml::to_value(&config).unwrap();
     let config_string = serde_yaml::to_string(&config_value).unwrap();
 
-    config_string
+    template_string + &config_string
 }
 
-async fn get_nodes_from(url: &str) -> Result<Vec<serde_json::Value>, Error> {
+pub async fn get_nodes_from(url: &str) -> Result<Vec<serde_json::Value>> {
     let res = reqwest::Client::new()
         .get(url)
         .header("User-Agent", UA)
@@ -186,6 +172,14 @@ async fn get_nodes_from(url: &str) -> Result<Vec<serde_json::Value>, Error> {
                 .collect::<Vec<String>>()
         })
         .map(node_builder)
+        .filter(|node| {
+            if let serde_json::Value::Object(map) = node {
+                if map.is_empty() {
+                    return false;
+                }
+            }
+            true
+        })
         .collect::<Vec<_>>();
     Ok(nodes)
 }
