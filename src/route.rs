@@ -10,14 +10,15 @@ use crate::service::*;
 use crate::structs::AppState;
 
 pub async fn init_app() -> Router {
-    let url = std::env::var("SUBC_URL").expect("SUBC_URL not set");
+    let url = std::env::var("URL").expect("URL not set");
 
     if let Ok(nodes) = get_nodes_from(&url).await {
-        let state = AppState { nodes };
+        let state = AppState { url, nodes };
         Router::new()
             .route("/", get(|| async { "ok" }))
             .route("/clash", get(clash::from_url))
             .route("/provider", get(clash::build_provider))
+            .route("/refresh", get(clash::refresh))
             .with_state(state)
             .layer((
                 TraceLayer::new_for_http()

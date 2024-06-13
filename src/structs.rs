@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct AppState {
+    pub url: String,
     pub nodes: Vec<serde_json::Value>,
 }
 

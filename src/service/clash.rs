@@ -33,8 +33,19 @@ pub async fn build_provider(
         .map(|n| n.to_owned())
         .collect::<Vec<_>>();
     let provider = ProxyProvider { proxies };
+    println!("{pattern}: {provider:?}");
     let provider = serde_yaml::to_value(provider).expect("Convert Provider Error");
     serde_yaml::to_string(&provider).expect("Convert Provider Error")
+}
+
+pub async fn refresh(State(mut state): State<AppState>) -> impl IntoResponse {
+    // Refresh the nodes in the state
+    if let Ok(nodes) = get_nodes_from(&state.url).await {
+        state.nodes = nodes;
+        "ok".to_string()
+    } else {
+        "not ok".to_string()
+    }
 }
 
 pub async fn from_url(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
